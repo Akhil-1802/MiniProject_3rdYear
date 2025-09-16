@@ -1,12 +1,53 @@
-# React + Vite
+# FinVision Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern financial management dashboard built with React and Tailwind CSS.
 
-Currently, two official plugins are available:
+## Getting Started
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### Prerequisites
+- Node.js (v16 or higher)
+- npm or yarn
 
-## Expanding the ESLint configuration
+### Installation
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+1. Navigate to the frontend directory:
+```bash
+cd fronten
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Start the development server:
+```bash
+npm run dev
+```
+
+4. Open your browser and visit:
+```
+http://localhost:5173
+```
+
+## Features
+
+- **Overview Dashboard** - Financial summary and analytics
+- **Transactions** - Income and expense management
+- **Investments** - Portfolio tracking and investment options
+- **Goals** - Financial goal setting and progress tracking
+- **AI Suggestions** - Personalized financial recommendations
+- **Dark/Light Mode** - Theme toggle with hanging bulb design
+
+## Tech Stack
+
+- React 18
+- Vite
+- Tailwind CSS
+- React Router DOM
+
+## Available Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
