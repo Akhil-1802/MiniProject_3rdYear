@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 const LandingPage = () => {
   const [isDark, setIsDark] = useState(true);
@@ -6,17 +7,13 @@ const LandingPage = () => {
   return (
     <div className={`${isDark ? 'bg-black text-white' : 'bg-white text-black'} overflow-x-hidden transition-colors duration-500`}>
       {/* Theme Toggle Button */}
-      <div className="fixed top-20 right-8 z-50">
-        <div className="relative">
-          <div className={`w-1 h-8 ${isDark ? 'bg-gray-600' : 'bg-gray-400'} mx-auto`}></div>
-          <button
-            onClick={() => setIsDark(!isDark)}
-            className={`w-12 h-12 rounded-full ${isDark ? 'bg-yellow-400 shadow-yellow-400/50' : 'bg-gray-800 shadow-gray-800/50'} shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110 flex items-center justify-center`}
-          >
-            <span className="text-xl">{isDark ? '💡' : '🌙'}</span>
-          </button>
-          <div className={`absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 rounded-full ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`}></div>
-        </div>
+      <div className="fixed bottom-6 right-6 z-50">
+        <button
+          onClick={() => setIsDark(!isDark)}
+          className={`w-12 h-12 rounded-full ${isDark ? 'bg-yellow-400 shadow-yellow-400/50' : 'bg-gray-800 shadow-gray-800/50'} shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110 flex items-center justify-center`}
+        >
+          <span className="text-xl">{isDark ? '💡' : '🌙'}</span>
+        </button>
       </div>
 
       {/* Header */}
@@ -35,8 +32,8 @@ const LandingPage = () => {
             <a href="#contact" className={`${isDark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-black'} transition-colors`}>Contact</a>
           </nav>
           <div className="flex items-center gap-4">
-            <button className={`${isDark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-black'} transition-colors`}>Sign In</button>
-            <button className={`${isDark ? 'bg-white text-black hover:bg-gray-200' : 'bg-black text-white hover:bg-gray-800'} px-6 py-2 rounded-full font-medium transition-colors`}>Get Started</button>
+            <Link to="/signin" className={`${isDark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-black'} transition-colors`}>Sign In</Link>
+            <Link to="/signin" className={`${isDark ? 'bg-white text-black hover:bg-gray-200' : 'bg-black text-white hover:bg-gray-800'} px-6 py-2 rounded-full font-medium transition-colors`}>Get Started</Link>
           </div>
         </div>
       </header>
@@ -52,9 +49,9 @@ const LandingPage = () => {
             Experience revolutionary AI-powered financial management that adapts to your life
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className={`${isDark ? 'bg-white text-black hover:bg-gray-200' : 'bg-black text-white hover:bg-gray-800'} px-8 py-4 rounded-full text-lg font-semibold transition-all transform hover:scale-105`}>
+            <Link to="/signin" className={`${isDark ? 'bg-white text-black hover:bg-gray-200' : 'bg-black text-white hover:bg-gray-800'} px-8 py-4 rounded-full text-lg font-semibold transition-all transform hover:scale-105 inline-block text-center`}>
               Start Free Trial
-            </button>
+            </Link>
             <button className={`border ${isDark ? 'border-gray-600 text-white hover:bg-white hover:text-black' : 'border-gray-400 text-black hover:bg-black hover:text-white'} px-8 py-4 rounded-full text-lg font-semibold transition-all`}>
               Watch Demo
             </button>
@@ -165,9 +162,9 @@ const LandingPage = () => {
           <p className={`text-xl ${isDark ? 'text-gray-300' : 'text-gray-600'} mb-12 max-w-2xl mx-auto`}>
             Join thousands of users who have revolutionized their financial future with FinVision
           </p>
-          <button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-12 py-6 rounded-full text-xl font-bold hover:from-blue-700 hover:to-purple-700 transition-all transform hover:scale-105 shadow-2xl">
+          <Link to="/signin" className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-12 py-6 rounded-full text-xl font-bold hover:from-blue-700 hover:to-purple-700 transition-all transform hover:scale-105 shadow-2xl inline-block">
             Start Your Journey
-          </button>
+          </Link>
         </div>
       </section>
     </div>

@@ -1,8 +1,60 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { auth } from '../firebase';
+import TransactionForm from '../components/TransactionForm';
+import GoalForm from '../components/GoalForm';
+import PDFUpload from '../components/PDFUpload';
 
 const Dashboard = () => {
   const [isDark, setIsDark] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  const [user, setUser] = useState(null);
+  const [userData, setUserData] = useState(null);
+  const [transactions, setTransactions] = useState([]);
+  const [goals, setGoals] = useState([]);
+  const [showTransactionForm, setShowTransactionForm] = useState(false);
+  const [showGoalForm, setShowGoalForm] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        try {
+          const response = await fetch(`http://localhost:3000/api/user/getuser/${currentUser.uid}`);
+          if (response.ok) {
+            const data = await response.json();
+            setUserData(data.user);
+          }
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+        }
+      }
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    fetchGoals();
+  }, []);
+
+  const fetchGoals = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/api/goals');
+      if (response.ok) {
+        const data = await response.json();
+        setGoals(data);
+      }
+    } catch (error) {
+      console.error('Error fetching goals:', error);
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    navigate('/');
+  };
 
   const sidebarItems = [
     { id: 'overview', icon: '📊', label: 'Overview' },
@@ -13,7 +65,46 @@ const Dashboard = () => {
     { id: 'settings', icon: '⚙️', label: 'Settings' },
   ];
 
-  const transactions = [
+  const handleAddTransaction = async (transactionData) => {
+    try {
+      const response = await fetch('http://localhost:3000/api/transactions/add', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(transactionData)
+      });
+      if (response.ok) {
+        const result = await response.json();
+        setTransactions(prev => [result.transaction, ...prev]);
+        setShowTransactionForm(false);
+      }
+    } catch (error) {
+      console.error('Error adding transaction:', error);
+    }
+  };
+
+  const handleAddGoal = async (goalData) => {
+    try {
+      const response = await fetch('http://localhost:3000/api/goals/add', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(goalData)
+      });
+      if (response.ok) {
+        const result = await response.json();
+        setGoals(prev => [result.goal, ...prev]);
+        setShowGoalForm(false);
+        alert(result.recommendation);
+      }
+    } catch (error) {
+      console.error('Error adding goal:', error);
+    }
+  };
+
+  const sampleTransactions = [
     { id: 1, date: '2024-07-28', description: 'Monthly Salary', category: 'Salary', amount: 75000, type: 'Income' },
     { id: 2, date: '2024-07-27', description: 'Groceries - SuperMart', category: 'Groceries', amount: -2300, type: 'Expense' },
     { id: 3, date: '2024-07-26', description: 'Electricity Bill', category: 'Utilities', amount: -1800, type: 'Expense' },
@@ -24,23 +115,19 @@ const Dashboard = () => {
   return (
     <div className={`min-h-screen ${isDark ? 'bg-black text-white' : 'bg-white text-black'} transition-colors duration-500`}>
       {/* Theme Toggle */}
-      <div className="fixed top-6 right-8 z-50">
-        <div className="relative">
-          <div className={`w-1 h-8 ${isDark ? 'bg-gray-600' : 'bg-gray-400'} mx-auto`}></div>
-          <button
-            onClick={() => setIsDark(!isDark)}
-            className={`w-12 h-12 rounded-full ${isDark ? 'bg-yellow-400 shadow-yellow-400/50' : 'bg-gray-800 shadow-gray-800/50'} shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110 flex items-center justify-center`}
-          >
-            <span className="text-xl">{isDark ? '💡' : '🌙'}</span>
-          </button>
-          <div className={`absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 rounded-full ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`}></div>
-        </div>
+      <div className="fixed bottom-6 right-6 z-50">
+        <button
+          onClick={() => setIsDark(!isDark)}
+          className={`w-12 h-12 rounded-full ${isDark ? 'bg-yellow-400 shadow-yellow-400/50' : 'bg-gray-800 shadow-gray-800/50'} shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110 flex items-center justify-center`}
+        >
+          <span className="text-xl">{isDark ? '💡' : '🌙'}</span>
+        </button>
       </div>
 
       <div className="flex">
         {/* Sidebar */}
-        <div className={`w-64 min-h-screen ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-gray-50 border-gray-200'} border-r fixed left-0 top-0 z-40`}>
-          <div className="p-6">
+        <div className={`w-64 min-h-screen ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-gray-50 border-gray-200'} border-r fixed left-0 top-0 z-40 flex flex-col`}>
+          <div className="p-6 flex-1">
             <div className="flex items-center gap-3 mb-8">
               <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
                 <span className="text-white text-sm">₿</span>
@@ -65,6 +152,16 @@ const Dashboard = () => {
               ))}
             </nav>
           </div>
+          
+          <div className="p-6">
+            <button
+              onClick={handleLogout}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 ${isDark ? 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white shadow-lg shadow-red-500/25' : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg shadow-red-500/25'}`}
+            >
+              <span className="text-xl">🚪</span>
+              <span className="font-semibold">Logout</span>
+            </button>
+          </div>
         </div>
 
         {/* Main Content */}
@@ -88,7 +185,7 @@ const Dashboard = () => {
                 🔔
               </button>
               <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
-                JD
+                {userData?.fullName?.charAt(0) || 'U'}
               </div>
             </div>
           </div>
@@ -111,7 +208,7 @@ const Dashboard = () => {
                     <h3 className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm font-medium`}>Monthly Income</h3>
                     <span className="text-blue-500 text-sm font-medium">+8.2%</span>
                   </div>
-                  <div className="text-3xl font-bold mb-2">$3,500.00</div>
+                  <div className="text-3xl font-bold mb-2">₹{userData?.monthlyIncome || 0}</div>
                   <p className={`${isDark ? 'text-gray-500' : 'text-gray-500'} text-sm`}>7 sources</p>
                 </div>
 
@@ -120,7 +217,7 @@ const Dashboard = () => {
                     <h3 className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm font-medium`}>Expenses</h3>
                     <span className="text-red-500 text-sm font-medium">+1.2%</span>
                   </div>
-                  <div className="text-3xl font-bold mb-2">$1,150.00</div>
+                  <div className="text-3xl font-bold mb-2">₹{userData?.monthlyExpense || 0}</div>
                   <p className={`${isDark ? 'text-gray-500' : 'text-gray-500'} text-sm`}>5 categories</p>
                 </div>
               </div>
@@ -246,54 +343,29 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              {/* Manual Entry & Upload */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                {/* Manual Entry */}
-                <div className={`${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} border rounded-2xl p-6`}>
-                  <h3 className="text-xl font-bold mb-6">Manual Entry</h3>
-                  <div className="space-y-4">
-                    <div className="flex gap-4">
-                      <button className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg font-medium">Income</button>
-                      <button className={`flex-1 py-2 px-4 ${isDark ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-600'} rounded-lg font-medium`}>Expense</button>
-                    </div>
-                    <input 
-                      type="text" 
-                      placeholder="Description (e.g., Monthly Salary)" 
-                      className={`w-full p-3 rounded-lg border ${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-black'}`}
-                    />
-                    <input 
-                      type="number" 
-                      placeholder="Amount (e.g., 50000)" 
-                      className={`w-full p-3 rounded-lg border ${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-black'}`}
-                    />
-                    <select className={`w-full p-3 rounded-lg border ${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-black'}`}>
-                      <option>Select Category</option>
-                      <option>Salary</option>
-                      <option>Freelance</option>
-                      <option>Investment</option>
-                      <option>Other</option>
-                    </select>
-                    <button className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
-                      Add Income
-                    </button>
-                  </div>
-                </div>
+              {/* Add Transaction Button */}
+              <div className="mb-6">
+                <button 
+                  onClick={() => setShowTransactionForm(!showTransactionForm)}
+                  className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                >
+                  {showTransactionForm ? 'Cancel' : '+ Add Transaction'}
+                </button>
+              </div>
 
-                {/* Upload Statements */}
-                <div className={`${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} border rounded-2xl p-6`}>
-                  <h3 className="text-xl font-bold mb-6">Upload Statements</h3>
-                  <div className={`border-2 border-dashed ${isDark ? 'border-gray-700' : 'border-gray-300'} rounded-lg p-8 text-center`}>
-                    <div className="text-4xl mb-4">📄</div>
-                    <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} mb-4`}>Drag & drop your files here, or</p>
-                    <button className={`${isDark ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'} px-6 py-2 rounded-lg font-medium transition-colors`}>
-                      Browse Files
-                    </button>
-                    <p className={`${isDark ? 'text-gray-500' : 'text-gray-500'} text-sm mt-2`}>Supported formats: CSV, PDF</p>
-                  </div>
-                  <button className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors mt-4">
-                    Process Statement
-                  </button>
+              {/* Transaction Form */}
+              {showTransactionForm && (
+                <div className="mb-8">
+                  <TransactionForm onSubmit={handleAddTransaction} isDark={isDark} />
                 </div>
+              )}
+
+              {/* PDF Upload */}
+              <div className="mb-8">
+                <PDFUpload 
+                  onUpload={(newTransactions) => setTransactions(prev => [...newTransactions, ...prev])} 
+                  isDark={isDark} 
+                />
               </div>
 
               {/* Transaction History */}
@@ -325,7 +397,7 @@ const Dashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {transactions.map((transaction) => (
+                      {(transactions.length > 0 ? transactions : sampleTransactions).map((transaction) => (
                         <tr key={transaction.id} className={`${isDark ? 'border-gray-700 hover:bg-gray-800' : 'border-gray-200 hover:bg-gray-50'} border-b transition-colors`}>
                           <td className="py-3 px-4">{transaction.date}</td>
                           <td className="py-3 px-4">{transaction.description}</td>
@@ -374,293 +446,103 @@ const Dashboard = () => {
               {/* Goals Header */}
               <div className="flex justify-between items-center mb-8">
                 <h2 className="text-2xl font-bold">My Financial Goals</h2>
-                <button className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2">
-                  <span>+</span> Add New Goal
+                <button 
+                  onClick={() => setShowGoalForm(!showGoalForm)}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
+                >
+                  <span>+</span> {showGoalForm ? 'Cancel' : 'Add New Goal'}
                 </button>
               </div>
 
+              {/* Goal Form */}
+              {showGoalForm && (
+                <div className="mb-8">
+                  <GoalForm onSubmit={handleAddGoal} isDark={isDark} />
+                </div>
+              )}
+
               {/* Goals Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {/* New Laptop Goal */}
-                <div className={`${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} border rounded-2xl p-6`}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <span className="text-blue-600">💻</span>
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-lg">New Laptop</h3>
-                      <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm`}>75% Complete</p>
-                    </div>
+                {goals.length === 0 ? (
+                  <div className={`${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} border rounded-2xl p-8 text-center col-span-full`}>
+                    <div className="text-4xl mb-4">🎯</div>
+                    <h3 className="text-xl font-bold mb-2">No Goals Yet</h3>
+                    <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Create your first financial goal to get started!</p>
                   </div>
-                  <div className="text-center mb-6">
-                    <div className="relative w-32 h-32 mx-auto mb-4">
-                      <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 36 36">
-                        <path className={`${isDark ? 'stroke-gray-700' : 'stroke-gray-200'}`} strokeWidth="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                        <path className="stroke-blue-500" strokeWidth="3" strokeDasharray="75, 100" strokeLinecap="round" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-2xl font-bold">75%</span>
+                ) : (
+                  goals.map((goal) => {
+                    const progress = Math.round((goal.currentAmount / goal.targetAmount) * 100);
+                    const remaining = goal.targetAmount - goal.currentAmount;
+                    
+                    return (
+                      <div key={goal._id} className={`${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} border rounded-2xl p-6`}>
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <span className="text-blue-600">
+                              {goal.category === 'car' ? '🚗' : 
+                               goal.category === 'house' ? '🏠' : 
+                               goal.category === 'vacation' ? '✈️' : 
+                               goal.category === 'education' ? '📚' : '🎯'}
+                            </span>
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-lg">{goal.title}</h3>
+                            <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm`}>{progress}% Complete</p>
+                          </div>
+                        </div>
+                        
+                        <div className="text-center mb-6">
+                          <div className="relative w-32 h-32 mx-auto mb-4">
+                            <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 36 36">
+                              <path className={`${isDark ? 'stroke-gray-700' : 'stroke-gray-200'}`} strokeWidth="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                              <path className="stroke-blue-500" strokeWidth="3" strokeDasharray={`${progress}, 100`} strokeLinecap="round" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            </svg>
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <span className="text-2xl font-bold">{progress}%</span>
+                            </div>
+                          </div>
+                          
+                          <div className="text-sm space-y-1">
+                            <div className="flex justify-between">
+                              <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Saved:</span>
+                              <span className="font-semibold">₹{goal.currentAmount.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Remaining:</span>
+                              <span className="font-semibold">₹{remaining.toLocaleString()}</span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Target:</span>
+                            <span className="font-semibold">₹{goal.targetAmount.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Monthly Savings:</span>
+                            <span className="font-semibold text-blue-500">₹{goal.recommendedMonthlySaving.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Target Date:</span>
+                            <span className="font-semibold">{new Date(goal.targetDate).toLocaleDateString()}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Status:</span>
+                            <span className={`font-semibold ${
+                              goal.status === 'completed' ? 'text-green-500' : 
+                              goal.status === 'active' ? 'text-blue-500' : 'text-yellow-500'
+                            }`}>
+                              {goal.status.charAt(0).toUpperCase() + goal.status.slice(1)}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div className="text-sm space-y-1">
-                      <div className="flex justify-between">
-                        <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Saved:</span>
-                        <span className="font-semibold">₹1,125</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Remaining:</span>
-                        <span className="font-semibold">₹375</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Target: ₹1,500</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Monthly Savings Needed:</span>
-                      <span className="font-semibold text-blue-500">₹50</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Est. Completion:</span>
-                      <span className="font-semibold">Oct 2024</span>
-                    </div>
-                  </div>
-                </div>
+                    );
+                  })
+                )}
 
-                {/* Dream Vacation Goal */}
-                <div className={`${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} border rounded-2xl p-6`}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                      <span className="text-green-600">✈️</span>
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-lg">Dream Vacation</h3>
-                      <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm`}>50% Complete</p>
-                    </div>
-                  </div>
-                  <div className="text-center mb-6">
-                    <div className="relative w-32 h-32 mx-auto mb-4">
-                      <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 36 36">
-                        <path className={`${isDark ? 'stroke-gray-700' : 'stroke-gray-200'}`} strokeWidth="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                        <path className="stroke-green-500" strokeWidth="3" strokeDasharray="50, 100" strokeLinecap="round" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-2xl font-bold">50%</span>
-                      </div>
-                    </div>
-                    <div className="text-sm space-y-1">
-                      <div className="flex justify-between">
-                        <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Saved:</span>
-                        <span className="font-semibold">₹2,500</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Remaining:</span>
-                        <span className="font-semibold">₹2,500</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Target: ₹5,000</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Monthly Savings Needed:</span>
-                      <span className="font-semibold text-green-500">₹250</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Est. Completion:</span>
-                      <span className="font-semibold">Dec 2025</span>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Down Payment Goal */}
-                <div className={`${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} border rounded-2xl p-6 relative`}>
-                  <div className="absolute top-4 right-4">
-                    <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full font-medium">20% Complete</span>
-                  </div>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                      <span className="text-purple-600">🏠</span>
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-lg">Down Payment for House</h3>
-                      <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm`}>Target: ₹50,000</p>
-                    </div>
-                  </div>
-                  <div className="text-center mb-6">
-                    <div className="relative w-32 h-32 mx-auto mb-4">
-                      <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 36 36">
-                        <path className={`${isDark ? 'stroke-gray-700' : 'stroke-gray-200'}`} strokeWidth="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                        <path className="stroke-purple-500" strokeWidth="3" strokeDasharray="20, 100" strokeLinecap="round" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-2xl font-bold">20%</span>
-                      </div>
-                    </div>
-                    <div className="text-sm space-y-1">
-                      <div className="flex justify-between">
-                        <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Saved:</span>
-                        <span className="font-semibold">₹10,000</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Remaining:</span>
-                        <span className="font-semibold">₹40,000</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Monthly Savings Needed:</span>
-                      <span className="font-semibold text-purple-500">₹500</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Est. Completion:</span>
-                      <span className="font-semibold">Jan 2027</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Emergency Fund Goal */}
-                <div className={`${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} border rounded-2xl p-6`}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
-                      <span className="text-orange-600">🛡️</span>
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-lg">Emergency Fund</h3>
-                      <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm`}>90% Complete</p>
-                    </div>
-                  </div>
-                  <div className="text-center mb-6">
-                    <div className="relative w-32 h-32 mx-auto mb-4">
-                      <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 36 36">
-                        <path className={`${isDark ? 'stroke-gray-700' : 'stroke-gray-200'}`} strokeWidth="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                        <path className="stroke-orange-500" strokeWidth="3" strokeDasharray="90, 100" strokeLinecap="round" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-2xl font-bold">90%</span>
-                      </div>
-                    </div>
-                    <div className="text-sm space-y-1">
-                      <div className="flex justify-between">
-                        <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Saved:</span>
-                        <span className="font-semibold">₹5,400</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Remaining:</span>
-                        <span className="font-semibold">₹600</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Target: ₹6,000</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Monthly Savings Needed:</span>
-                      <span className="font-semibold text-orange-500">₹600</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Est. Completion:</span>
-                      <span className="font-semibold">Jul 2024</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Retirement Fund Goal */}
-                <div className={`${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} border rounded-2xl p-6`}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
-                      <span className="text-indigo-600">🏖️</span>
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-lg">Retirement Fund</h3>
-                      <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm`}>10% Complete</p>
-                    </div>
-                  </div>
-                  <div className="text-center mb-6">
-                    <div className="relative w-32 h-32 mx-auto mb-4">
-                      <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 36 36">
-                        <path className={`${isDark ? 'stroke-gray-700' : 'stroke-gray-200'}`} strokeWidth="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                        <path className="stroke-indigo-500" strokeWidth="3" strokeDasharray="10, 100" strokeLinecap="round" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-2xl font-bold">10%</span>
-                      </div>
-                    </div>
-                    <div className="text-sm space-y-1">
-                      <div className="flex justify-between">
-                        <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Saved:</span>
-                        <span className="font-semibold">₹100,000</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Remaining:</span>
-                        <span className="font-semibold">₹900,000</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Target: ₹1,000,000</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Monthly Savings Needed:</span>
-                      <span className="font-semibold text-indigo-500">₹1,000</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Est. Completion:</span>
-                      <span className="font-semibold">Dec 2040</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* New Bike Goal */}
-                <div className={`${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} border rounded-2xl p-6 relative`}>
-                  <div className="absolute top-4 right-4">
-                    <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full font-medium">Goal Achieved!</span>
-                  </div>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-8 h-8 bg-teal-100 rounded-lg flex items-center justify-center">
-                      <span className="text-teal-600">🏍️</span>
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-lg">New Bike</h3>
-                      <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm`}>Target: ₹800</p>
-                    </div>
-                  </div>
-                  <div className="text-center mb-6">
-                    <div className="relative w-32 h-32 mx-auto mb-4">
-                      <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 36 36">
-                        <path className="stroke-teal-500" strokeWidth="3" strokeDasharray="100, 100" strokeLinecap="round" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-2xl font-bold text-green-500">✓</span>
-                      </div>
-                    </div>
-                    <div className="text-sm space-y-1">
-                      <div className="flex justify-between">
-                        <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Saved:</span>
-                        <span className="font-semibold text-green-500">₹800</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Remaining:</span>
-                        <span className="font-semibold">₹0</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Monthly Savings Needed:</span>
-                      <span className="font-semibold">₹0</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Est. Completion:</span>
-                      <span className="font-semibold text-green-500">Mar 2024</span>
-                    </div>
-                  </div>
-                </div>
               </div>
             </>
           )}

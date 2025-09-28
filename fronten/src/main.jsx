@@ -4,15 +4,35 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import './index.css'
 import LandingPage from './components/LandingPage.jsx'
 import Dashboard from './pages/Dashboard.jsx'
+import SignIn from './pages/SignIn.jsx'
+import SignUp from './pages/SignUp.jsx'
+import VerifyEmail from './pages/VerifyEmail.jsx'
+import BasicInformation from './pages/BasicInformation.jsx'
+import AuthGuard from './components/AuthGuard.jsx'
 
 const router = createBrowserRouter([
   {
     path: '/',
-    element: <LandingPage />
+    element: <AuthGuard requireAuth={false}><LandingPage /></AuthGuard>
   },
   {
     path: '/dashboard',
-    element: <Dashboard />
+    element: <AuthGuard><Dashboard /></AuthGuard>
+  },{
+    path : '/signin',
+    element : <AuthGuard requireAuth={false}><SignIn/></AuthGuard>
+  },
+  {
+    path : '/signup',
+    element : <AuthGuard requireAuth={false}><SignUp/></AuthGuard>
+  },
+  {
+    path:'/verify-email',
+    element : <VerifyEmail/>
+  },
+  {
+    path: '/basic-information',
+    element: <BasicInformation />
   }
 ])
 
