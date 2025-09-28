@@ -10,7 +10,7 @@ const addGoal = async (req, res) => {
   try {
     const { title, targetAmount, targetDate, category } = req.body;
     const userId = req.user.id;
-
+    const user = await User.findOne({firebaseUid : userId});
     const currentDate = new Date();
     const target = new Date(targetDate);
     const monthsToTarget = Math.ceil((target - currentDate) / (1000 * 60 * 60 * 24 * 30));
@@ -18,7 +18,7 @@ const addGoal = async (req, res) => {
     const recommendedMonthlySaving = calculateMonthlySaving(targetAmount, 0, monthsToTarget);
 
     const goal = new Goal({
-      userId,
+      userId :user._id,
       title,
       targetAmount,
       targetDate: target,
@@ -41,7 +41,8 @@ const addGoal = async (req, res) => {
 const getGoals = async (req, res) => {
   try {
     const userId = req.user.id;
-    const goals = await Goal.find({ userId }).sort({ createdAt: -1 });
+    const user = await User.findOne({firebaseUid : userId})
+    const goals = await Goal.find({ userId : user._id }).sort({ createdAt: -1 });
     res.json(goals);
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-const PDFUpload = ({ onUpload, isDark }) => {
+const PDFUpload = ({ onUpload, isDark, userId, onToast }) => {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
 
@@ -14,7 +14,10 @@ const PDFUpload = ({ onUpload, isDark }) => {
   };
 
   const handleUpload = async () => {
-    if (!file) return;
+    if (!file || !userId) {
+      alert('Please make sure you are logged in and a file is selected');
+      return;
+    }
 
     setUploading(true);
     const formData = new FormData();
@@ -23,6 +26,9 @@ const PDFUpload = ({ onUpload, isDark }) => {
     try {
       const response = await fetch('http://localhost:3000/api/transactions/upload-pdf', {
         method: 'POST',
+        headers: {
+          'user-id': userId
+        },
         body: formData
       });
 
@@ -30,13 +36,15 @@ const PDFUpload = ({ onUpload, isDark }) => {
         const result = await response.json();
         onUpload(result.transactions);
         setFile(null);
-        alert(`Successfully extracted ${result.transactions.length} transactions!`);
+        onToast({ message: `Successfully extracted ${result.transactions.length} transactions!`, type: 'success' });
       } else {
-        alert('Error uploading PDF');
+        const errorData = await response.json();
+        console.error('PDF upload error:', errorData);
+        onToast({ message: errorData.error || 'Failed to upload PDF', type: 'error' });
       }
     } catch (error) {
       console.error('Upload error:', error);
-      alert('Error uploading PDF');
+      onToast({ message: 'Error uploading PDF', type: 'error' });
     } finally {
       setUploading(false);
     }
@@ -68,14 +76,14 @@ const PDFUpload = ({ onUpload, isDark }) => {
 
       <button
         onClick={handleUpload}
-        disabled={!file || uploading}
+        disabled={!file || !userId || uploading}
         className={`w-full py-3 rounded-lg font-semibold transition-colors ${
           !file || uploading
-            ? 'bg-gray-400 cursor-not-allowed'
+            ? 'bg-gray-400 cursor-not-allowed text-gray-600'
             : 'bg-green-600 hover:bg-green-700 text-white'
         }`}
       >
-        {uploading ? 'Analyzing PDF...' : 'Analyze PDF Statement'}
+        {uploading ? 'Analyzing PDF...' : !userId ? 'Please log in' : 'Analyze PDF Statement'}
       </button>
     </div>
   );

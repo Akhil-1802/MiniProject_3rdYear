@@ -5,6 +5,9 @@ import { auth } from '../firebase';
 import TransactionForm from '../components/TransactionForm';
 import GoalForm from '../components/GoalForm';
 import PDFUpload from '../components/PDFUpload';
+import EditModal from '../components/EditModal';
+import DeleteModal from '../components/DeleteModal';
+import Toast from '../components/Toast';
 
 const Dashboard = () => {
   const [isDark, setIsDark] = useState(true);
@@ -13,8 +16,12 @@ const Dashboard = () => {
   const [userData, setUserData] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [goals, setGoals] = useState([]);
+  const [pagination, setPagination] = useState({ currentPage: 1, totalPages: 1, totalTransactions: 0 });
   const [showTransactionForm, setShowTransactionForm] = useState(false);
   const [showGoalForm, setShowGoalForm] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState(null);
+  const [deletingTransaction, setDeletingTransaction] = useState(null);
+  const [toast, setToast] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -36,18 +43,40 @@ const Dashboard = () => {
   }, []);
 
   useEffect(() => {
-    fetchGoals();
-  }, []);
+    if (user) {
+      fetchGoals();
+      fetchTransactions();
+    }
+  }, [user]);
 
   const fetchGoals = async () => {
+    if (!user?.uid) return;
     try {
-      const response = await fetch('http://localhost:3000/api/goals');
+      const response = await fetch('http://localhost:3000/api/goals', {
+        headers: { 'user-id': user.uid }
+      });
       if (response.ok) {
         const data = await response.json();
         setGoals(data);
       }
     } catch (error) {
       console.error('Error fetching goals:', error);
+    }
+  };
+
+  const fetchTransactions = async (page = 1) => {
+    if (!user?.uid) return;
+    try {
+      const response = await fetch(`http://localhost:3000/api/transactions?page=${page}&limit=10`, {
+        headers: { 'user-id': user.uid }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setTransactions(data.transactions || data);
+        if (data.pagination) setPagination(data.pagination);
+      }
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
     }
   };
 
@@ -66,30 +95,35 @@ const Dashboard = () => {
   ];
 
   const handleAddTransaction = async (transactionData) => {
+    if (!user?.uid) return;
     try {
       const response = await fetch('http://localhost:3000/api/transactions/add', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'user-id': user.uid
         },
         body: JSON.stringify(transactionData)
       });
       if (response.ok) {
         const result = await response.json();
-        setTransactions(prev => [result.transaction, ...prev]);
+        fetchTransactions(1);
         setShowTransactionForm(false);
+        setToast({ message: 'Transaction added successfully!', type: 'success' });
       }
     } catch (error) {
       console.error('Error adding transaction:', error);
     }
   };
-
   const handleAddGoal = async (goalData) => {
+    if (!user?.uid) return;
     try {
+      
       const response = await fetch('http://localhost:3000/api/goals/add', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'user-id': user.uid
         },
         body: JSON.stringify(goalData)
       });
@@ -97,20 +131,54 @@ const Dashboard = () => {
         const result = await response.json();
         setGoals(prev => [result.goal, ...prev]);
         setShowGoalForm(false);
-        alert(result.recommendation);
+        setToast({ message: result.recommendation, type: 'success' });
       }
     } catch (error) {
       console.error('Error adding goal:', error);
     }
   };
 
-  const sampleTransactions = [
-    { id: 1, date: '2024-07-28', description: 'Monthly Salary', category: 'Salary', amount: 75000, type: 'Income' },
-    { id: 2, date: '2024-07-27', description: 'Groceries - SuperMart', category: 'Groceries', amount: -2300, type: 'Expense' },
-    { id: 3, date: '2024-07-26', description: 'Electricity Bill', category: 'Utilities', amount: -1800, type: 'Expense' },
-    { id: 4, date: '2024-07-25', description: 'Freelance Project - Acme Corp', category: 'Freelance', amount: 45000, type: 'Income' },
-    { id: 5, date: '2024-07-24', description: 'Dining - Restaurant XYZ', category: 'Dining', amount: -1200, type: 'Expense' },
-  ];
+  const handleDeleteTransaction = async (id) => {
+    if (!user?.uid) return;
+    try {
+      const response = await fetch(`http://localhost:3000/api/transactions/${id}`, {
+        method: 'DELETE',
+        headers: { 'user-id': user.uid }
+      });
+      if (response.ok) {
+        fetchTransactions(pagination.currentPage);
+        setDeletingTransaction(null);
+      }
+    } catch (error) {
+      console.error('Error deleting transaction:', error);
+    }
+  };
+
+  const handleEditTransaction = (transaction) => {
+    setEditingTransaction(transaction);
+  };
+
+  const updateTransaction = async (id, updatedData) => {
+    if (!user?.uid) return;
+    try {
+      const response = await fetch(`http://localhost:3000/api/transactions/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'user-id': user.uid
+        },
+        body: JSON.stringify(updatedData)
+      });
+      if (response.ok) {
+        fetchTransactions(pagination.currentPage);
+        setEditingTransaction(null);
+      }
+    } catch (error) {
+      console.error('Error updating transaction:', error);
+    }
+  };
+
+
 
   return (
     <div className={`min-h-screen ${isDark ? 'bg-black text-white' : 'bg-white text-black'} transition-colors duration-500`}>
@@ -364,7 +432,9 @@ const Dashboard = () => {
               <div className="mb-8">
                 <PDFUpload 
                   onUpload={(newTransactions) => setTransactions(prev => [...newTransactions, ...prev])} 
-                  isDark={isDark} 
+                  isDark={isDark}
+                  userId={user?.uid}
+                  onToast={setToast}
                 />
               </div>
 
@@ -378,9 +448,7 @@ const Dashboard = () => {
                       placeholder="Search transactions..." 
                       className={`px-4 py-2 rounded-lg border ${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-black'}`}
                     />
-                    <button className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors">
-                      Add New Transaction
-                    </button>
+                    
                   </div>
                 </div>
                 
@@ -397,9 +465,16 @@ const Dashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {(transactions.length > 0 ? transactions : sampleTransactions).map((transaction) => (
-                        <tr key={transaction.id} className={`${isDark ? 'border-gray-700 hover:bg-gray-800' : 'border-gray-200 hover:bg-gray-50'} border-b transition-colors`}>
-                          <td className="py-3 px-4">{transaction.date}</td>
+                      {transactions.length === 0 ? (
+                        <tr>
+                          <td colSpan="6" className={`py-8 text-center ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                            No transactions found. Add some transactions to get started!
+                          </td>
+                        </tr>
+                      ) : (
+                        transactions.map((transaction) => (
+                          <tr key={transaction._id} className={`${isDark ? 'border-gray-700 hover:bg-gray-800' : 'border-gray-200 hover:bg-gray-50'} border-b transition-colors`}>
+                          <td className="py-3 px-4">{new Date(transaction.date).toLocaleDateString()}</td>
                           <td className="py-3 px-4">{transaction.description}</td>
                           <td className="py-3 px-4">
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -412,31 +487,76 @@ const Dashboard = () => {
                               {transaction.category}
                             </span>
                           </td>
-                          <td className={`py-3 px-4 font-semibold ${transaction.amount > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                            ₹{Math.abs(transaction.amount).toLocaleString()}
+                          <td className={`py-3 px-4 font-semibold ${transaction.type === 'income' ? 'text-green-500' : 'text-red-500'}`}>
+                            ₹{transaction.amount.toLocaleString()}
                           </td>
                           <td className="py-3 px-4">
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              transaction.type === 'Income' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                              transaction.type === 'income' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                             }`}>
-                              {transaction.type}
+                              {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
                             </span>
                           </td>
                           <td className="py-3 px-4">
                             <div className="flex gap-2">
-                              <button className={`p-1 rounded ${isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-200'} transition-colors`}>
+                              <button 
+                                onClick={() => handleEditTransaction(transaction)}
+                                className={`p-2 rounded-lg ${isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-200'} transition-colors`}
+                                title="Edit transaction"
+                              >
                                 ✏️
                               </button>
-                              <button className={`p-1 rounded ${isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-200'} transition-colors`}>
+                              <button 
+                                onClick={() => setDeletingTransaction(transaction)}
+                                className={`p-2 rounded-lg ${isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-200'} transition-colors`}
+                                title="Delete transaction"
+                              >
                                 🗑️
                               </button>
                             </div>
                           </td>
                         </tr>
-                      ))}
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
+                
+                {/* Pagination */}
+                {pagination.totalPages > 1 && (
+                  <div className="flex justify-between items-center mt-6">
+                    <div className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                      Showing {transactions.length} of {pagination.totalTransactions} transactions
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => fetchTransactions(pagination.currentPage - 1)}
+                        disabled={!pagination.hasPrev}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          !pagination.hasPrev
+                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            : isDark ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                        }`}
+                      >
+                        Previous
+                      </button>
+                      <span className={`px-3 py-2 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        Page {pagination.currentPage} of {pagination.totalPages}
+                      </span>
+                      <button
+                        onClick={() => fetchTransactions(pagination.currentPage + 1)}
+                        disabled={!pagination.hasNext}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          !pagination.hasNext
+                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            : isDark ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                        }`}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -955,6 +1075,36 @@ const Dashboard = () => {
           )}
         </div>
       </div>
+      
+      {/* Edit Modal */}
+      {editingTransaction && (
+        <EditModal
+          transaction={editingTransaction}
+          onSave={updateTransaction}
+          onClose={() => setEditingTransaction(null)}
+          isDark={isDark}
+        />
+      )}
+      
+      {/* Delete Modal */}
+      {deletingTransaction && (
+        <DeleteModal
+          transaction={deletingTransaction}
+          onConfirm={handleDeleteTransaction}
+          onClose={() => setDeletingTransaction(null)}
+          isDark={isDark}
+        />
+      )}
+      
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+          isDark={isDark}
+        />
+      )}
     </div>
   );
 };
