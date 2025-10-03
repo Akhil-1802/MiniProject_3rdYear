@@ -29,7 +29,7 @@ const transactionSchema = new mongoose.Schema({
   },
   source: {
     type: String,
-    enum: ['manual', 'pdf'],
+    enum: ['manual', 'pdf', 'pdf-ai', 'image-ai'],
     default: 'manual'
   },
   pdfFileName: {

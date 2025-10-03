@@ -30,7 +30,16 @@ const SignUp = () => {
     setError('');
     
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      const errorMsg = 'Passwords do not match';
+      setError(errorMsg);
+      setToast({ message: errorMsg, type: 'error' });
+      return;
+    }
+    
+    if (formData.password.length < 6) {
+      const errorMsg = 'Password must be at least 6 characters long';
+      setError(errorMsg);
+      setToast({ message: errorMsg, type: 'error' });
       return;
     }
     
@@ -62,10 +71,25 @@ const SignUp = () => {
           navigate('/verify-email', { state: { userId: data.userId, email: formData.email } });
         }, 2000);
       } else {
-        setError(data.message);
+        const errorMsg = data.message || 'Registration failed. Please try again.';
+        setError(errorMsg);
+        setToast({ message: errorMsg, type: 'error' });
       }
     } catch (error) {
-      setError(error.message || 'Registration failed. Please try again.');
+      let errorMessage = 'Registration failed. Please try again.';
+      
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'This email is already registered. Please use a different email or sign in.';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'Password is too weak. Please use at least 6 characters.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Please enter a valid email address.';
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      }
+      
+      setError(errorMessage);
+      setToast({ message: errorMessage, type: 'error' });
     }
     setLoading(false);
   };

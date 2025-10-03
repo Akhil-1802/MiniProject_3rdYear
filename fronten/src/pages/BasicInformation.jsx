@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase';
+import Toast from '../components/Toast';
 
 const BasicInformation = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -12,15 +13,24 @@ const BasicInformation = () => {
     recurringTransactions: []
   });
   const [newTransaction, setNewTransaction] = useState({ name: '', amount: '', frequency: 'monthly' });
-  const [expenseMethod, setExpenseMethod] = useState('manual');
+  const [inputMethod, setInputMethod] = useState('manual');
   const [uploadedFile, setUploadedFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [pdfAnalyzed, setPdfAnalyzed] = useState(false);
+  const [toast, setToast] = useState(null);
   const navigate = useNavigate();
 
   const handleSubmit = async () => {
     const user = auth.currentUser;
-    if (!user) return;
+    if (!user) {
+      setToast({ message: 'Please log in to continue', type: 'error' });
+      return;
+    }
 
-    console.log('Submitting form data:', formData);
+    if (!formData.monthlyIncome || !formData.monthlyExpense) {
+      setToast({ message: 'Please enter both income and expense amounts', type: 'error' });
+      return;
+    }
 
     try {
       const response = await fetch(`http://localhost:3000/api/user/basic-info/${user.uid}`, {
@@ -30,13 +40,16 @@ const BasicInformation = () => {
       });
 
       const result = await response.json();
-      console.log('Backend response:', result);
 
       if (response.ok) {
-        navigate('/dashboard');
+        setToast({ message: 'Profile setup completed successfully!', type: 'success' });
+        setTimeout(() => navigate('/dashboard'), 1500);
+      } else {
+        setToast({ message: result.error || 'Failed to save information', type: 'error' });
       }
     } catch (error) {
       console.error('Error saving basic info:', error);
+      setToast({ message: 'Network error. Please try again.', type: 'error' });
     }
   };
 
@@ -50,77 +63,151 @@ const BasicInformation = () => {
     }
   };
 
-  const handlePdfUpload = (e) => {
+  const handlePdfUpload = async (e) => {
     const file = e.target.files[0];
-    if (file && file.type === 'application/pdf') {
-      setUploadedFile(file);
-      // For now, just set a placeholder expense amount
-      // In a real app, you'd process the PDF to extract expense data
-      setFormData(prev => ({ ...prev, monthlyExpense: 0 }));
+    if (!file || file.type !== 'application/pdf') {
+      setToast({ message: 'Please select a valid PDF file', type: 'error' });
+      return;
+    }
+
+    const user = auth.currentUser;
+    if (!user) {
+      setToast({ message: 'Please log in first', type: 'error' });
+      return;
+    }
+
+    setUploadedFile(file);
+    setUploading(true);
+    
+    const formData = new FormData();
+    formData.append('pdf', file);
+
+    try {
+      const response = await fetch('http://localhost:3000/api/transactions/analyze-income-expense', {
+        method: 'POST',
+        headers: {
+          'user-id': user.uid
+        },
+        body: formData
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setFormData(prev => ({
+          ...prev,
+          monthlyIncome: result.monthlyIncome,
+          monthlyExpense: result.monthlyExpense
+        }));
+        setPdfAnalyzed(true);
+        setToast({ message: `AI analyzed ${result.transactionCount} transactions successfully!`, type: 'success' });
+      } else {
+        const errorData = await response.json();
+        setToast({ message: errorData.error || 'Failed to analyze PDF', type: 'error' });
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      setToast({ message: 'Error analyzing PDF. Please try again.', type: 'error' });
+    } finally {
+      setUploading(false);
     }
   };
 
   const slides = [
     {
-      title: "What's your monthly income?",
+      title: "Set up your monthly income & expenses",
       content: (
         <div className="space-y-6">
-          <input
-            type="number"
-            placeholder="Enter your monthly income"
-            value={formData.monthlyIncome}
-            onChange={(e) => setFormData(prev => ({ ...prev, monthlyIncome: Number(e.target.value) }))}
-            className={`w-full px-6 py-4 rounded-xl text-xl ${isDark ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300 text-black'} border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-          />
-        </div>
-      )
-    },
-    {
-      title: "What's your monthly expense?",
-      content: (
-        <div className="space-y-6">
-          <div className="flex gap-4 mb-4">
+          <div className="flex gap-4 mb-6">
             <button
-              onClick={() => setExpenseMethod('manual')}
-              className={`flex-1 py-2 px-4 rounded-lg font-medium ${expenseMethod === 'manual' ? 'bg-blue-600 text-white' : isDark ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-600'}`}
+              onClick={() => setInputMethod('manual')}
+              className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors ${inputMethod === 'manual' ? 'bg-blue-600 text-white' : isDark ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
             >
-              Manual Entry
+              📝 Manual Entry
             </button>
             <button
-              onClick={() => setExpenseMethod('upload')}
-              className={`flex-1 py-2 px-4 rounded-lg font-medium ${expenseMethod === 'upload' ? 'bg-blue-600 text-white' : isDark ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-600'}`}
+              onClick={() => setInputMethod('upload')}
+              className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors ${inputMethod === 'upload' ? 'bg-blue-600 text-white' : isDark ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
             >
-              Upload PDF
+              🤖 AI Analysis
             </button>
           </div>
           
-          {expenseMethod === 'manual' ? (
-            <input
-              type="number"
-              placeholder="Enter your monthly expense"
-              value={formData.monthlyExpense}
-              onChange={(e) => setFormData(prev => ({ ...prev, monthlyExpense: Number(e.target.value) }))}
-              className={`w-full px-6 py-4 rounded-xl text-xl ${isDark ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300 text-black'} border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-            />
+          {inputMethod === 'manual' ? (
+            <div className="space-y-4">
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Monthly Income</label>
+                <input
+                  type="number"
+                  placeholder="Enter your monthly income"
+                  value={formData.monthlyIncome}
+                  onChange={(e) => setFormData(prev => ({ ...prev, monthlyIncome: Number(e.target.value) }))}
+                  className={`w-full px-4 py-3 rounded-xl ${isDark ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300 text-black'} border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                />
+              </div>
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Monthly Expenses</label>
+                <input
+                  type="number"
+                  placeholder="Enter your monthly expenses"
+                  value={formData.monthlyExpense}
+                  onChange={(e) => setFormData(prev => ({ ...prev, monthlyExpense: Number(e.target.value) }))}
+                  className={`w-full px-4 py-3 rounded-xl ${isDark ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300 text-black'} border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                />
+              </div>
+            </div>
           ) : (
-            <div className={`border-2 border-dashed ${isDark ? 'border-gray-700' : 'border-gray-300'} rounded-xl p-8 text-center`}>
-              <div className="text-4xl mb-4">📄</div>
-              <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} mb-4`}>Upload your expense statement (PDF)</p>
-              <input
-                type="file"
-                accept=".pdf"
-                onChange={handlePdfUpload}
-                className="hidden"
-                id="pdf-upload"
-              />
-              <label
-                htmlFor="pdf-upload"
-                className={`${isDark ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'} px-6 py-2 rounded-lg font-medium cursor-pointer transition-colors`}
-              >
-                Choose PDF File
-              </label>
-              {uploadedFile && (
-                <p className="mt-2 text-green-500">✓ {uploadedFile.name} uploaded</p>
+            <div className="space-y-4">
+              <div className={`border-2 border-dashed ${isDark ? 'border-gray-700' : 'border-gray-300'} rounded-xl p-8 text-center`}>
+                <div className="text-4xl mb-4">🤖📄</div>
+                <h3 className="font-semibold mb-2">AI-Powered Transaction Analysis</h3>
+                <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} mb-4 text-sm`}>
+                  Upload your bank statement and let AI calculate your income & expenses automatically
+                </p>
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={handlePdfUpload}
+                  className="hidden"
+                  id="pdf-upload"
+                  disabled={uploading}
+                />
+                <label
+                  htmlFor="pdf-upload"
+                  className={`${uploading ? 'bg-gray-400 cursor-not-allowed' : isDark ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'} text-white px-6 py-3 rounded-lg font-medium cursor-pointer transition-colors inline-block`}
+                >
+                  {uploading ? 'Analyzing...' : 'Upload Bank Statement'}
+                </label>
+                {uploadedFile && (
+                  <div className="mt-4">
+                    <p className="text-green-500 text-sm">✓ {uploadedFile.name}</p>
+                    {pdfAnalyzed && (
+                      <p className="text-blue-500 text-sm mt-1">AI analysis complete!</p>
+                    )}
+                  </div>
+                )}
+              </div>
+              
+              {pdfAnalyzed && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className={`p-4 rounded-lg ${isDark ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                    <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>AI Calculated Income</label>
+                    <input
+                      type="number"
+                      value={formData.monthlyIncome}
+                      onChange={(e) => setFormData(prev => ({ ...prev, monthlyIncome: Number(e.target.value) }))}
+                      className={`w-full px-3 py-2 rounded-lg ${isDark ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-black'} border text-sm`}
+                    />
+                  </div>
+                  <div className={`p-4 rounded-lg ${isDark ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                    <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>AI Calculated Expenses</label>
+                    <input
+                      type="number"
+                      value={formData.monthlyExpense}
+                      onChange={(e) => setFormData(prev => ({ ...prev, monthlyExpense: Number(e.target.value) }))}
+                      className={`w-full px-3 py-2 rounded-lg ${isDark ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-black'} border text-sm`}
+                    />
+                  </div>
+                </div>
               )}
             </div>
           )}
@@ -248,6 +335,16 @@ const BasicInformation = () => {
           </div>
         </div>
       </div>
+      
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+          isDark={isDark}
+        />
+      )}
     </div>
   );
 };

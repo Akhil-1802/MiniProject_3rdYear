@@ -55,9 +55,12 @@ const PDFUpload = ({ onUpload, isDark, userId, onToast }) => {
       <h3 className="text-xl font-bold mb-6">Upload PDF Statement</h3>
       
       <div className={`border-2 border-dashed ${isDark ? 'border-gray-700' : 'border-gray-300'} rounded-lg p-8 text-center mb-4`}>
-        <div className="text-4xl mb-4">📄</div>
-        <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} mb-4`}>
-          {file ? file.name : 'Select a PDF file to analyze'}
+        <div className="text-4xl mb-4">🤖📄</div>
+        <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} mb-2`}>
+          {file ? file.name : 'AI-Powered PDF Analysis'}
+        </p>
+        <p className={`text-sm ${isDark ? 'text-gray-500' : 'text-gray-500'} mb-4`}>
+          Upload bank statements for intelligent transaction extraction
         </p>
         <input
           type="file"
@@ -83,7 +86,7 @@ const PDFUpload = ({ onUpload, isDark, userId, onToast }) => {
             : 'bg-green-600 hover:bg-green-700 text-white'
         }`}
       >
-        {uploading ? 'Analyzing PDF...' : !userId ? 'Please log in' : 'Analyze PDF Statement'}
+        {uploading ? 'AI Analyzing PDF...' : !userId ? 'Please log in' : 'Analyze with AI'}
       </button>
     </div>
   );

@@ -5,6 +5,7 @@ import { auth } from '../firebase';
 import TransactionForm from '../components/TransactionForm';
 import GoalForm from '../components/GoalForm';
 import PDFUpload from '../components/PDFUpload';
+import ImageAnalysis from '../components/ImageAnalysis';
 import EditModal from '../components/EditModal';
 import DeleteModal from '../components/DeleteModal';
 import Toast from '../components/Toast';
@@ -428,9 +429,15 @@ const Dashboard = () => {
                 </div>
               )}
 
-              {/* PDF Upload */}
-              <div className="mb-8">
+              {/* PDF Upload & Image Analysis */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <PDFUpload 
+                  onUpload={(newTransactions) => setTransactions(prev => [...newTransactions, ...prev])} 
+                  isDark={isDark}
+                  userId={user?.uid}
+                  onToast={setToast}
+                />
+                <ImageAnalysis 
                   onUpload={(newTransactions) => setTransactions(prev => [...newTransactions, ...prev])} 
                   isDark={isDark}
                   userId={user?.uid}

@@ -26,14 +26,18 @@ const SignIn = () => {
       const response = await fetch(`http://localhost:3000/api/user/getuser/${firebaseUser.uid}`);
       
       if (!response.ok) {
-        setError('User data not found. Please contact support.');
+        const errorMsg = 'User data not found. Please contact support.';
+        setError(errorMsg);
+        setToast({ message: errorMsg, type: 'error' });
         setLoading(false);
         return;
       }
       
       const userData = await response.json();
       if (!userData.user.isVerified) {
-        setError('Please verify your email before signing in.');
+        const errorMsg = 'Please verify your email before signing in.';
+        setError(errorMsg);
+        setToast({ message: errorMsg, type: 'error' });
         setLoading(false);
         return;
       }
@@ -41,7 +45,24 @@ const SignIn = () => {
       setToast({ message: 'Signed in successfully!', type: 'success' });
       setTimeout(() => navigate('/dashboard'), 2000);
     } catch (error) {
-      setError(error.message);
+      let errorMessage = 'Sign in failed. Please try again.';
+      
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = 'No account found with this email. Please sign up first.';
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = 'Incorrect password. Please try again.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Please enter a valid email address.';
+      } else if (error.code === 'auth/user-disabled') {
+        errorMessage = 'This account has been disabled. Please contact support.';
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many failed attempts. Please try again later.';
+      }
+      
+      setError(errorMessage);
+      setToast({ message: errorMessage, type: 'error' });
     }
     setLoading(false);
   };
